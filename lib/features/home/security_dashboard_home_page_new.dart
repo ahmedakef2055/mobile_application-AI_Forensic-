@@ -48,7 +48,7 @@ class _SecurityDashboardHomePageState
       backgroundColor: _p.background,
       appBar: AppBarWidget(
         title: t('home.title'),
-        subtitle: 'لوحة التحكم الأساسية والإحصائيات الأمنية',
+        subtitle: t('home.subtitle'),
         notificationCount: alertsState.alerts.length,
         onNotificationTap: () => context.push('/notifications'),
         onSettingsTap: () => context.push('/settings'),

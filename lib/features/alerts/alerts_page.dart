@@ -38,7 +38,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       backgroundColor: p.background,
       appBar: AppBarWidget(
         title: t('alerts.title'),
-        subtitle: 'جميع التنبيهات الأمنية والمنبهات',
+        subtitle: t('alerts.subtitle'),
         showSearch: true,
       ),
       body: SafeArea(

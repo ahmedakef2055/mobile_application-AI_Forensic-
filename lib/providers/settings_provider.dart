@@ -58,6 +58,10 @@ class AppStrings {
   static const Map<String, Map<String, String>> _t = {
     // Home / Dashboard
     'home.title': {'ar': 'لوحة التحكم', 'en': 'Dashboard'},
+    'home.subtitle': {
+      'ar': 'لوحة التحكم الأساسية والإحصائيات الأمنية',
+      'en': 'Core dashboard and security statistics'
+    },
     'home.search.hint': {
       'ar': 'ابحث عن حادثة أو تنبيه...',
       'en': 'Search incidents or alerts...'
@@ -98,6 +102,10 @@ class AppStrings {
     'incidents.subtitle': {
       'ar': 'إدارة ومتابعة الحوادث الأمنية',
       'en': 'Manage and track security incidents'
+    },
+    'incidents.item.subtitle': {
+      'ar': 'اضغط لعرض التفاصيل',
+      'en': 'Tap to view details'
     },
     'incidents.tab.all': {'ar': 'الكل', 'en': 'All'},
     'incidents.tab.open': {'ar': 'مفتوحة', 'en': 'Open'},
@@ -212,6 +220,10 @@ class AppStrings {
 
     // Profile page
     'profile.title': {'ar': 'الملف الشخصي', 'en': 'Profile'},
+    'profile.subtitle': {
+      'ar': 'بيانات ملفك الشخصي والإعدادات',
+      'en': 'Your profile data and settings'
+    },
     'profile.role': {'ar': 'مسؤول الأمان', 'en': 'Security Admin'},
     'profile.security': {'ar': 'المصادقة والأمان', 'en': 'Auth & Security'},
     'profile.security.sub': {
@@ -277,6 +289,10 @@ class AppStrings {
 
     // Alerts page
     'alerts.title': {'ar': 'التنبيهات', 'en': 'Alerts'},
+    'alerts.subtitle': {
+      'ar': 'جميع التنبيهات الأمنية والمنبهات',
+      'en': 'All security alerts and notifications'
+    },
     'alerts.empty': {'ar': 'لا توجد تنبيهات', 'en': 'No alerts'},
     'alerts.empty.sub': {
       'ar': 'لا توجد تنبيهات مطابقة للفلتر',

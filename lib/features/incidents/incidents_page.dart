@@ -16,44 +16,45 @@ class IncidentsPage extends ConsumerStatefulWidget {
 class _IncidentsPageState extends ConsumerState<IncidentsPage> {
   int selectedTabIndex = 0;
 
-  final incidents = <_IncidentItem>[
-    _IncidentItem(
-      code: 'INC-01',
-      title: 'Brute Force Attack',
-      subtitle: 'Tap to view details',
-      severity: _Severity.high,
-    ),
-    _IncidentItem(
-      code: 'INC-02',
-      title: 'SQL Injection',
-      subtitle: 'Tap to view details',
-      severity: _Severity.high,
-    ),
-    _IncidentItem(
-      code: 'INC-03',
-      title: 'DDoS Attack',
-      subtitle: 'Tap to view details',
-      severity: _Severity.high,
-    ),
-    _IncidentItem(
-      code: 'INC-04',
-      title: 'Malware Detection',
-      subtitle: 'Tap to view details',
-      severity: _Severity.medium,
-    ),
-    _IncidentItem(
-      code: 'INC-05',
-      title: 'Phishing Attempt',
-      subtitle: 'Tap to view details',
-      severity: _Severity.high,
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final _p = c(context);
     final settings = ref.watch(settingsProvider);
     String t(String k) => AppStrings.get(k, settings.locale);
+
+    final itemSubtitle = t('incidents.item.subtitle');
+    final incidents = <_IncidentItem>[
+      _IncidentItem(
+        code: 'INC-01',
+        title: 'Brute Force Attack',
+        subtitle: itemSubtitle,
+        severity: _Severity.high,
+      ),
+      _IncidentItem(
+        code: 'INC-02',
+        title: 'SQL Injection',
+        subtitle: itemSubtitle,
+        severity: _Severity.high,
+      ),
+      _IncidentItem(
+        code: 'INC-03',
+        title: 'DDoS Attack',
+        subtitle: itemSubtitle,
+        severity: _Severity.high,
+      ),
+      _IncidentItem(
+        code: 'INC-04',
+        title: 'Malware Detection',
+        subtitle: itemSubtitle,
+        severity: _Severity.medium,
+      ),
+      _IncidentItem(
+        code: 'INC-05',
+        title: 'Phishing Attempt',
+        subtitle: itemSubtitle,
+        severity: _Severity.high,
+      ),
+    ];
 
     final tabs = [
       t('incidents.tab.all'),
@@ -65,7 +66,7 @@ class _IncidentsPageState extends ConsumerState<IncidentsPage> {
     return Scaffold(
       appBar: AppBarWidget(
         title: t('incidents.title'),
-        subtitle: 'عرض الحوادث الأمنية المكتشفة',
+        subtitle: t('incidents.subtitle'),
       ),
       body: Container(
         width: double.infinity,

@@ -33,7 +33,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       backgroundColor: p.background,
       appBar: AppBarWidget(
         title: t('settings.title'),
-        subtitle: 'إدارة إعدادات التطبيق والحسابات',
+        subtitle: t('settings.subtitle'),
       ),
       body: CustomScrollView(
         slivers: [

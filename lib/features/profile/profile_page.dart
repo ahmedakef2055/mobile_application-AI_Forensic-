@@ -24,7 +24,7 @@ class ProfilePage extends ConsumerWidget {
       backgroundColor: p.background,
       appBar: AppBarWidget(
         title: t('profile.title'),
-        subtitle: 'بيانات ملفك الشخصي والإعدادات',
+        subtitle: t('profile.subtitle'),
       ),
       body: CustomScrollView(
         slivers: [

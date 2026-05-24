@@ -50,64 +50,14 @@ class AlertsNotifier extends StateNotifier<AlertsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Mock data - replace with actual API call
-      // final response = await apiService.get<List<dynamic>>('/alerts');
+      final response = await apiService.get<Map<String, dynamic>>('/alerts');
+      final list = response['data'] as List<dynamic>? ?? [];
 
-      final mockAlerts = [
-        Alert(
-          id: '1',
-          title: 'Critical Security Alert',
-          message: 'Unauthorized access attempt detected on Database Server',
-          severity: Severity.critical,
-          alertType: 'intrusion',
-          timestamp: DateTime.now().subtract(Duration(minutes: 5)),
-          sourceIp: '192.168.1.100',
-          affectedSystem: 'Database Server',
-          isRead: false,
-          actionUrl: '/incidents/1',
-        ),
-        Alert(
-          id: '2',
-          title: 'High Priority Alert',
-          message: 'Suspicious file upload detected in web directory',
-          severity: Severity.high,
-          alertType: 'malware',
-          timestamp: DateTime.now().subtract(Duration(hours: 1)),
-          sourceIp: '10.0.0.50',
-          affectedSystem: 'Web Server',
-          isRead: false,
-          actionUrl: '/incidents/2',
-        ),
-        Alert(
-          id: '3',
-          title: 'Medium Priority Alert',
-          message: 'Unusual network traffic pattern detected',
-          severity: Severity.medium,
-          alertType: 'network_anomaly',
-          timestamp: DateTime.now().subtract(Duration(hours: 3)),
-          sourceIp: '203.0.113.10',
-          affectedSystem: 'Network Gateway',
-          isRead: true,
-          actionUrl: '/alerts/3',
-        ),
-        Alert(
-          id: '4',
-          title: 'Policy Violation Alert',
-          message: 'User accessed restricted data folder',
-          severity: Severity.low,
-          alertType: 'policy_violation',
-          timestamp: DateTime.now().subtract(Duration(hours: 6)),
-          sourceIp: '192.168.1.55',
-          affectedSystem: 'File Server',
-          isRead: true,
-          actionUrl: null,
-        ),
-      ];
-
-      final unreadCount = mockAlerts.where((a) => !a.isRead).length;
+      final alerts = list.map((item) => _alertFromApi(item as Map<String, dynamic>)).toList();
+      final unreadCount = alerts.where((a) => !a.isRead).length;
 
       state = state.copyWith(
-        alerts: mockAlerts,
+        alerts: alerts,
         unreadCount: unreadCount,
         isLoading: false,
       );
@@ -119,36 +69,44 @@ class AlertsNotifier extends StateNotifier<AlertsState> {
     }
   }
 
+  Alert _alertFromApi(Map<String, dynamic> json) {
+    final message = json['message'] as String? ?? '';
+    final incidentId = json['incident_id'];
+    final createdAt = json['created_at'] as String?;
+    return Alert(
+      id: json['id']?.toString() ?? '0',
+      title: message.length > 60 ? '${message.substring(0, 60)}…' : message,
+      message: message,
+      severity: Severity.medium,
+      alertType: json['channel'] as String? ?? 'web',
+      timestamp: createdAt != null ? DateTime.parse(createdAt) : DateTime.now(),
+      sourceIp: '',
+      affectedSystem: null,
+      isRead: json['delivered_at'] != null,
+      actionUrl: incidentId != null ? '/incidents/$incidentId' : null,
+    );
+  }
+
   Future<void> markAsRead(String alertId) async {
     final updatedAlerts = state.alerts.map((alert) {
-      if (alert.id == alertId) {
-        return alert.copyWith(isRead: true);
-      }
+      if (alert.id == alertId) return alert.copyWith(isRead: true);
       return alert;
     }).toList();
 
-    final unreadCount = updatedAlerts.where((a) => !a.isRead).length;
-
     state = state.copyWith(
       alerts: updatedAlerts,
-      unreadCount: unreadCount,
+      unreadCount: updatedAlerts.where((a) => !a.isRead).length,
     );
 
-    // Send to API
-    // await apiService.put('/alerts/$alertId/read');
+    try {
+      await apiService.post<Map<String, dynamic>>('/alerts/$alertId/delivered');
+    } catch (_) {}
   }
 
   Future<void> markAllAsRead() async {
     final updatedAlerts =
         state.alerts.map((alert) => alert.copyWith(isRead: true)).toList();
-
-    state = state.copyWith(
-      alerts: updatedAlerts,
-      unreadCount: 0,
-    );
-
-    // Send to API
-    // await apiService.put('/alerts/mark-all-read');
+    state = state.copyWith(alerts: updatedAlerts, unreadCount: 0);
   }
 
   void filterBySeverity(Severity severity) {

@@ -69,44 +69,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String username, String password) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final apiService = ref.read(apiServiceProvider);
       final localStorage = ref.read(localStorageProvider);
 
-      // Mock authentication - replace with actual API call
-      // final response = await apiService.post('/auth/login', data: {
-      //   'email': email,
-      //   'password': password,
-      // });
-
-      // For now, mock successful login
-      final mockUser = User(
-        id: '1',
-        name: 'User',
-        email: email,
-        profileImageUrl: null,
-        notificationsEnabled: true,
-        timezone: 'UTC',
-        role: 'admin',
-        createdAt: DateTime.now(),
-        lastLogin: DateTime.now(),
+      final response = await apiService.post<Map<String, dynamic>>(
+        '/auth/login',
+        data: {'username': username, 'password': password},
       );
 
-      const mockToken = 'mock_jwt_token_123456';
+      final data = response['data'] as Map<String, dynamic>;
+      final token = data['token'] as String;
+      final userJson = data['user'] as Map<String, dynamic>;
+      final user = _userFromApi(userJson);
 
-      await localStorage.saveAuthToken(mockToken);
-      await localStorage.saveUser(mockUser.toJson());
-      apiService.setAuthToken(mockToken);
+      await localStorage.saveAuthToken(token);
+      await localStorage.saveUser(user.toJson());
+      apiService.setAuthToken(token);
 
       state = state.copyWith(
         isAuthenticated: true,
-        user: mockUser,
+        user: user,
         isLoading: false,
       );
-
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -124,37 +112,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final apiService = ref.read(apiServiceProvider);
       final localStorage = ref.read(localStorageProvider);
 
-      // Mock signup - replace with actual API call
-      // final response = await apiService.post('/auth/signup', data: {
-      //   'name': name,
-      //   'email': email,
-      //   'password': password,
-      // });
-
-      final mockUser = User(
-        id: '1',
-        name: name,
-        email: email,
-        profileImageUrl: null,
-        notificationsEnabled: true,
-        timezone: 'UTC',
-        role: 'user',
-        createdAt: DateTime.now(),
-        lastLogin: DateTime.now(),
+      final response = await apiService.post<Map<String, dynamic>>(
+        '/auth/register',
+        data: {'username': name, 'email': email, 'password': password},
       );
 
-      const mockToken = 'mock_jwt_token_123456';
+      final data = response['data'] as Map<String, dynamic>;
+      final token = data['token'] as String;
+      final userJson = data['user'] as Map<String, dynamic>;
+      final user = _userFromApi(userJson);
 
-      await localStorage.saveAuthToken(mockToken);
-      await localStorage.saveUser(mockUser.toJson());
-      apiService.setAuthToken(mockToken);
+      await localStorage.saveAuthToken(token);
+      await localStorage.saveUser(user.toJson());
+      apiService.setAuthToken(token);
 
       state = state.copyWith(
         isAuthenticated: true,
-        user: mockUser,
+        user: user,
         isLoading: false,
       );
-
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -167,29 +143,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
-
     try {
+      final apiService = ref.read(apiServiceProvider);
+      final localStorage = ref.read(localStorageProvider);
+      await apiService.post<Map<String, dynamic>>('/auth/logout');
+      await localStorage.logout();
+      apiService.setAuthToken(null);
+      state = AuthState();
+    } catch (_) {
       final localStorage = ref.read(localStorageProvider);
       await localStorage.logout();
-
       state = AuthState();
-    } catch (e) {
-      state = state.copyWith(
-        error: 'فشل تسجيل الخروج: ${e.toString()}',
-        isLoading: false,
-      );
     }
   }
 
   Future<bool> resetPassword(String email) async {
     state = state.copyWith(isLoading: true, error: null);
-
     try {
-      // Mock password reset - replace with actual API call
-      // final response = await apiService.post('/auth/forgot-password', data: {
-      //   'email': email,
-      // });
-
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
@@ -199,5 +169,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return false;
     }
+  }
+
+  User _userFromApi(Map<String, dynamic> json) {
+    return User(
+      id: json['user_id']?.toString() ?? '0',
+      name: json['username'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      profileImageUrl: null,
+      notificationsEnabled: true,
+      timezone: 'UTC',
+      role: json['role'] as String? ?? 'user',
+      createdAt: DateTime.now(),
+      lastLogin: DateTime.now(),
+    );
   }
 }

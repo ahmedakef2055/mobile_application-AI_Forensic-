@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/security_metric.dart';
 import '../services/api_service.dart';
+import 'auth_provider.dart';
 
 class DashboardState {
   final DashboardMetrics? metrics;
@@ -30,10 +31,6 @@ class DashboardState {
   }
 }
 
-final apiServiceProvider = Provider((ref) {
-  return ApiService();
-});
-
 final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
   final apiService = ref.watch(apiServiceProvider);
@@ -52,83 +49,93 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Mock data - replace with actual API call
-      // final response = await apiService.get<Map<String, dynamic>>('/dashboard/metrics');
+      final response = await apiService.get<Map<String, dynamic>>('/dashboard/stats');
+      final data = response['data'] as Map<String, dynamic>;
 
-      final mockMetrics = DashboardMetrics(
-        activeAlerts: 12,
-        openIncidents: 5,
-        threatsBlocked: 342,
-        systemHealth: 89.5,
-        metrics: [
-          SecurityMetric(
-            id: '1',
-            name: 'CPU Usage',
-            value: 45,
-            threshold: 80,
-            unit: '%',
-            timestamp: DateTime.now(),
-            trend: 'stable',
-            category: 'performance',
-          ),
-          SecurityMetric(
-            id: '2',
-            name: 'Memory Usage',
-            value: 62,
-            threshold: 85,
-            unit: '%',
-            timestamp: DateTime.now(),
-            trend: 'up',
-            category: 'performance',
-          ),
-          SecurityMetric(
-            id: '3',
-            name: 'Network Traffic',
-            value: 340,
-            threshold: 500,
-            unit: 'Mbps',
-            timestamp: DateTime.now(),
-            trend: 'stable',
-            category: 'performance',
-          ),
-          SecurityMetric(
-            id: '4',
-            name: 'Threats Detected',
-            value: 45,
-            threshold: 10,
-            unit: 'count',
-            timestamp: DateTime.now(),
-            trend: 'down',
-            category: 'threats',
-          ),
-          SecurityMetric(
-            id: '5',
-            name: 'Failed Logins',
-            value: 23,
-            threshold: 5,
-            unit: 'count',
-            timestamp: DateTime.now(),
-            trend: 'up',
-            category: 'threats',
-          ),
-          SecurityMetric(
-            id: '6',
-            name: 'Compliance Score',
-            value: 94,
-            threshold: 90,
-            unit: '%',
-            timestamp: DateTime.now(),
-            trend: 'stable',
-            category: 'compliance',
-          ),
-        ],
-        lastUpdated: DateTime.now(),
-      );
+      final incidents = data['incidents'] as Map<String, dynamic>? ?? {};
+      final network = data['network'] as Map<String, dynamic>? ?? {};
+      final predictions = data['predictions'] as Map<String, dynamic>? ?? {};
+      final web = data['web'] as Map<String, dynamic>? ?? {};
+      final mobile = data['mobile'] as Map<String, dynamic>? ?? {};
+
+      final securityEvents = (web['security_events'] as num?)?.toInt() ?? 0;
+      final systemHealth = (100.0 - (securityEvents * 2.5)).clamp(0.0, 100.0);
+      final now = DateTime.now();
+
+      final metrics = [
+        SecurityMetric(
+          id: '1',
+          name: 'Open Incidents',
+          value: (incidents['open'] as num?)?.toInt() ?? 0,
+          threshold: 20,
+          unit: 'count',
+          timestamp: now,
+          trend: 'stable',
+          category: 'threats',
+        ),
+        SecurityMetric(
+          id: '2',
+          name: 'Critical Incidents',
+          value: (incidents['critical'] as num?)?.toInt() ?? 0,
+          threshold: 5,
+          unit: 'count',
+          timestamp: now,
+          trend: 'up',
+          category: 'threats',
+        ),
+        SecurityMetric(
+          id: '3',
+          name: 'Network Flows (24h)',
+          value: (network['recent_flows_24h'] as num?)?.toInt() ?? 0,
+          threshold: 500,
+          unit: 'flows',
+          timestamp: now,
+          trend: 'stable',
+          category: 'performance',
+        ),
+        SecurityMetric(
+          id: '4',
+          name: 'Web Security Events',
+          value: securityEvents,
+          threshold: 10,
+          unit: 'count',
+          timestamp: now,
+          trend: securityEvents > 10 ? 'up' : 'stable',
+          category: 'threats',
+        ),
+        SecurityMetric(
+          id: '5',
+          name: 'AI Predictions (24h)',
+          value: (predictions['recent_24h'] as num?)?.toInt() ?? 0,
+          threshold: 100,
+          unit: 'count',
+          timestamp: now,
+          trend: 'stable',
+          category: 'performance',
+        ),
+        SecurityMetric(
+          id: '6',
+          name: 'Mobile Events',
+          value: (mobile['total_events'] as num?)?.toInt() ?? 0,
+          threshold: 200,
+          unit: 'count',
+          timestamp: now,
+          trend: 'stable',
+          category: 'performance',
+        ),
+      ];
 
       state = state.copyWith(
-        metrics: mockMetrics,
+        metrics: DashboardMetrics(
+          activeAlerts: (incidents['critical'] as num?)?.toInt() ?? 0,
+          openIncidents: (incidents['open'] as num?)?.toInt() ?? 0,
+          threatsBlocked: (predictions['total'] as num?)?.toInt() ?? 0,
+          systemHealth: systemHealth,
+          metrics: metrics,
+          lastUpdated: now,
+        ),
         isLoading: false,
-        lastUpdated: DateTime.now(),
+        lastUpdated: now,
       );
     } catch (e) {
       state = state.copyWith(

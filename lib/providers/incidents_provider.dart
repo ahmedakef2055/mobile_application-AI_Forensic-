@@ -53,91 +53,49 @@ class IncidentsNotifier extends StateNotifier<IncidentsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Mock data - replace with actual API call
-      // final response = await apiService.get<List<dynamic>>('/incidents');
+      final response = await apiService.get<Map<String, dynamic>>('/incidents');
+      final list = response['data'] as List<dynamic>? ?? [];
 
-      final mockIncidents = [
-        Incident(
-          id: '1',
-          title: 'Unauthorized Access Attempt',
-          description: 'Multiple failed login attempts detected from suspicious IP',
-          severity: Severity.critical,
-          sourceIp: '192.168.1.100',
-          targetSystem: 'Database Server',
-          timestamp: DateTime.now().subtract(Duration(hours: 2)),
-          resolvedAt: null,
-          status: 'open',
-          tags: ['intrusion', 'authentication'],
-          affectedUser: 'admin@company.com',
-          eventCount: 15,
-        ),
-        Incident(
-          id: '2',
-          title: 'Suspicious File Upload',
-          description: 'Executable file detected in user upload directory',
-          severity: Severity.high,
-          sourceIp: '10.0.0.50',
-          targetSystem: 'Web Server',
-          timestamp: DateTime.now().subtract(Duration(hours: 5)),
-          resolvedAt: DateTime.now().subtract(Duration(hours: 1)),
-          status: 'resolved',
-          tags: ['malware', 'suspicious-file'],
-          affectedUser: 'user@company.com',
-          eventCount: 8,
-        ),
-        Incident(
-          id: '3',
-          title: 'DDoS Attack Detected',
-          description: 'Large volume of traffic detected from multiple sources',
-          severity: Severity.critical,
-          sourceIp: '203.0.113.0/24',
-          targetSystem: 'API Server',
-          timestamp: DateTime.now().subtract(Duration(minutes: 30)),
-          resolvedAt: null,
-          status: 'investigating',
-          tags: ['ddos', 'network'],
-          affectedUser: null,
-          eventCount: 5000,
-        ),
-        Incident(
-          id: '4',
-          title: 'Privilege Escalation Attempt',
-          description: 'User attempted to access restricted resources',
-          severity: Severity.medium,
-          sourceIp: '192.168.1.55',
-          targetSystem: 'Application Server',
-          timestamp: DateTime.now().subtract(Duration(hours: 12)),
-          resolvedAt: DateTime.now().subtract(Duration(hours: 10)),
-          status: 'resolved',
-          tags: ['privilege-escalation', 'access-control'],
-          affectedUser: 'user2@company.com',
-          eventCount: 3,
-        ),
-        Incident(
-          id: '5',
-          title: 'Data Exfiltration Detected',
-          description: 'Unusual data transfer volume detected',
-          severity: Severity.high,
-          sourceIp: '172.16.0.20',
-          targetSystem: 'Database Server',
-          timestamp: DateTime.now().subtract(Duration(hours: 8)),
-          resolvedAt: null,
-          status: 'investigating',
-          tags: ['data-breach', 'exfiltration'],
-          affectedUser: 'admin@company.com',
-          eventCount: 42,
-        ),
-      ];
+      final incidents = list
+          .map((item) => _incidentFromApi(item as Map<String, dynamic>))
+          .toList();
 
-      state = state.copyWith(
-        incidents: mockIncidents,
-        isLoading: false,
-      );
+      state = state.copyWith(incidents: incidents, isLoading: false);
     } catch (e) {
       state = state.copyWith(
         error: 'فشل تحميل الحوادث: ${e.toString()}',
         isLoading: false,
       );
+    }
+  }
+
+  Incident _incidentFromApi(Map<String, dynamic> json) {
+    final createdAt = json['created_at'] as String?;
+    final closedAt = json['closed_at'] as String?;
+    final severityLevel = json['severity_level'] as String? ?? '';
+    return Incident(
+      id: (json['incident_id'] ?? json['id'])?.toString() ?? '0',
+      title: json['type'] as String? ?? 'Unknown',
+      description: 'Severity score: ${json['severity_score'] ?? 0}',
+      severity: _severityFromString(severityLevel),
+      sourceIp: '',
+      targetSystem: null,
+      timestamp: createdAt != null ? DateTime.parse(createdAt) : DateTime.now(),
+      resolvedAt: closedAt != null ? DateTime.parse(closedAt) : null,
+      status: json['status'] as String? ?? 'open',
+      tags: [],
+      affectedUser: null,
+      eventCount: (json['severity_score'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Severity _severityFromString(String level) {
+    switch (level.toLowerCase()) {
+      case 'critical': return Severity.critical;
+      case 'high': return Severity.high;
+      case 'medium': return Severity.medium;
+      case 'low': return Severity.low;
+      default: return Severity.info;
     }
   }
 

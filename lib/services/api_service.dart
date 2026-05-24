@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://api.ai-forensic.com/v1';
+  static const String baseUrl = 'http://localhost:8000/api';
   static const Duration timeoutDuration = Duration(seconds: 30);
 
   late final Dio _dio;

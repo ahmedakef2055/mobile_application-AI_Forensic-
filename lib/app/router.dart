@@ -51,10 +51,7 @@ final appRouter = GoRouter(
       path: SecurityAlertsPage.routePath,
       builder: (context, state) => const SecurityAlertsPage(),
     ),
-    GoRoute(
-      path: IncidentDetailPage.routePath,
-      builder: (context, state) => const IncidentDetailPage(),
-    ),
+    // IncidentDetailPage is opened via Navigator.push from incidents_page (requires incident object)
     GoRoute(
       path: ProfileSettingsPage.routePath,
       builder: (context, state) => const ProfileSettingsPage(),

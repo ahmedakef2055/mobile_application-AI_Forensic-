@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../incidents/incident_detail_page.dart';
+import '../notifications/notifications_page.dart';
 
 class SecurityAlertsPage extends StatefulWidget {
   const SecurityAlertsPage({super.key});
@@ -16,6 +18,15 @@ class _SecurityAlertsPageState extends State<SecurityAlertsPage> {
 
   final timeRanges = const ['Last 24 hours', 'Last 7 days', 'Last 30 days'];
   String selectedRange = 'Last 24 hours';
+
+  bool _searchVisible = false;
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   final alerts = <_AlertItem>[
     _AlertItem(
@@ -46,9 +57,18 @@ class _SecurityAlertsPageState extends State<SecurityAlertsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final q = _searchCtrl.text.toLowerCase();
     final filtered = alerts.where((a) {
-      if (selectedFilter == 'All') return true;
-      return a.severity.label.toLowerCase() == selectedFilter.toLowerCase();
+      if (selectedFilter != 'All' &&
+          a.severity.label.toLowerCase() != selectedFilter.toLowerCase()) {
+        return false;
+      }
+      if (q.isNotEmpty &&
+          !a.title.toLowerCase().contains(q) &&
+          !a.source.toLowerCase().contains(q)) {
+        return false;
+      }
+      return true;
     }).toList();
 
     final counts = _Counts.from(alerts);
@@ -70,9 +90,47 @@ class _SecurityAlertsPageState extends State<SecurityAlertsPage> {
                 title: 'Security Alerts',
                 subtitle: 'Real-time monitoring',
                 onBack: () => Navigator.pop(context),
-                onSearch: () {},
-                onBell: () {},
+                onSearch: () => setState(() => _searchVisible = !_searchVisible),
+                onBell: () => context.go(NotificationsPage.routePath),
               ),
+              if (_searchVisible)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: StatefulBuilder(
+                    builder: (context, setLocal) => TextField(
+                      controller: _searchCtrl,
+                      autofocus: true,
+                      style: const TextStyle(color: AppColors.text, fontSize: 14),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search alerts...',
+                        hintStyle: const TextStyle(color: AppColors.mutedText),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.mutedText, size: 20),
+                        suffixIcon: _searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: AppColors.mutedText, size: 18),
+                                onPressed: () { _searchCtrl.clear(); setState(() {}); },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: AppColors.card,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 14),
 
               // Chips
@@ -122,7 +180,16 @@ class _SecurityAlertsPageState extends State<SecurityAlertsPage> {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const IncidentDetailPage(),
+                        builder: (_) => IncidentDetailPage(
+                          data: IncidentData(
+                            id: '0',
+                            title: filtered[i].title,
+                            description: 'Source: ${filtered[i].source}',
+                            code: 'INC-00000',
+                            severityLabel: filtered[i].severity.label,
+                            source: filtered[i].source,
+                          ),
+                        ),
                       ),
                     ),
                   ),

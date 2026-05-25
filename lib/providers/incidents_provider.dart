@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/incident.dart';
 import '../models/severity.dart';
 import '../services/api_service.dart';
+import 'auth_provider.dart';
 
 class IncidentsState {
   final List<Incident> incidents;

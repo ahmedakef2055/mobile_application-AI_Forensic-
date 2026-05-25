@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../alerts/security_alerts_page.dart';
+import '../notifications/notifications_page.dart';
 import '../profile/profile_settings_page.dart';
 
 class SecurityDashboardHomePage extends StatelessWidget {
@@ -33,7 +35,7 @@ class SecurityDashboardHomePage extends StatelessWidget {
                 title: 'Security Dashboard',
                 subtitle: 'Real-time monitoring & analytics',
                 onBack: () => Navigator.pop(context),
-                onBell: () {},
+                onBell: () => context.go(NotificationsPage.routePath),
                 onSettings: () {
                   Navigator.push(
                   context,

@@ -317,6 +317,8 @@ class _ProfileHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
     final p = c(context);
     return Container(
       decoration: BoxDecoration(
@@ -386,13 +388,22 @@ class _ProfileHeader extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'admin@company.com',
+              user?.name.isNotEmpty == true ? user!.name : (user?.email ?? 'User'),
               style: TextStyle(
                 color: p.text,
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
               ),
             ),
+            if (user?.email != null && user!.email.isNotEmpty)
+              Text(
+                user.email,
+                style: TextStyle(
+                  color: p.mutedText,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             const SizedBox(height: 4),
             Container(
               padding:

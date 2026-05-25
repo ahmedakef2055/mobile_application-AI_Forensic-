@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/assets/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/local_storage_service.dart';
 import '../auth/login_page.dart';
+import '../home/security_dashboard_home_page.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -62,7 +65,12 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
     _timer = Timer(const Duration(milliseconds: 3000), () {
       if (!mounted) return;
-      context.go(LoginPage.routePath);
+      final token = LocalStorageService().getAuthToken();
+      if (token != null && token.isNotEmpty) {
+        context.go(SecurityDashboardHomePage.routePath);
+      } else {
+        context.go(LoginPage.routePath);
+      }
     });
   }
 

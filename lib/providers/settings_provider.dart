@@ -11,7 +11,7 @@ class AppSettings {
 
   const AppSettings({
     this.themeMode = AppThemeMode.light,
-    this.locale = AppLocale.ar,
+    this.locale = AppLocale.en,
   });
 
   AppSettings copyWith({

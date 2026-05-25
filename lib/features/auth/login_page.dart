@@ -33,7 +33,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   void initState() {
     super.initState();
-    emailCtrl = TextEditingController(text: 'admin@company.com');
+    emailCtrl = TextEditingController();
     passCtrl = TextEditingController();
   }
 
@@ -45,7 +45,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    if (!formKey.currentState!.validate()) {
+    final username = emailCtrl.text.trim();
+    final password = passCtrl.text;
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى إدخال اسم المستخدم وكلمة المرور'),
+          backgroundColor: Color(0xFFFF3B30),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -104,11 +113,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     _LoginCard(
                       rememberMe: rememberMe,
                       obscure: obscure,
+                      isLoading: isLoading,
                       emailCtrl: emailCtrl,
                       passCtrl: passCtrl,
                       onToggleRemember: (v) => setState(() => rememberMe = v),
                       onToggleObscure: () => setState(() => obscure = !obscure),
                       onGoSignup: () => context.push(SignupPage.routePath),
+                      onSignIn: _handleLogin,
                     ),
                     const SizedBox(height: 18),
                   ],
@@ -179,20 +190,24 @@ class _LogoHeader extends StatelessWidget {
 class _LoginCard extends StatelessWidget {
   final bool rememberMe;
   final bool obscure;
+  final bool isLoading;
   final TextEditingController emailCtrl;
   final TextEditingController passCtrl;
   final ValueChanged<bool> onToggleRemember;
   final VoidCallback onToggleObscure;
   final VoidCallback onGoSignup;
+  final VoidCallback onSignIn;
 
   const _LoginCard({
     required this.rememberMe,
     required this.obscure,
+    required this.isLoading,
     required this.emailCtrl,
     required this.passCtrl,
     required this.onToggleRemember,
     required this.onToggleObscure,
     required this.onGoSignup,
+    required this.onSignIn,
   });
 
   @override
@@ -218,7 +233,7 @@ class _LoginCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Email Address',
+            'Username or Email',
             style: TextStyle(
               color: _p.text,
               fontSize: 12.5,
@@ -228,8 +243,8 @@ class _LoginCard extends StatelessWidget {
           const SizedBox(height: 8),
           _Input(
             controller: emailCtrl,
-            hint: 'admin@company.com',
-            prefix: Icon(Icons.mail_outline,
+            hint: 'Enter username or email',
+            prefix: Icon(Icons.person_outline,
                 size: 18, color: _p.mutedText),
             keyboardType: TextInputType.emailAddress,
           ),
@@ -287,8 +302,8 @@ class _LoginCard extends StatelessWidget {
 
           const SizedBox(height: 8),
           _PrimaryButton(
-            text: 'Sign In',
-            onPressed: () => context.go(SecurityDashboardHomePage.routePath),
+            text: isLoading ? 'Signing in...' : 'Sign In',
+            onPressed: isLoading ? () {} : onSignIn,
           ),
 
           // ✅ سطر Sign up

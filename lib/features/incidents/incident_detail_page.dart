@@ -1,187 +1,215 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
+import '../../providers/auth_provider.dart';
 
-class IncidentDetailPage extends StatefulWidget {
-  const IncidentDetailPage({super.key});
+class IncidentData {
+  final String id;
+  final String title;
+  final String description;
+  final String code;
+  final String severityLabel;
+  final String target;
+  final String source;
+  final String time;
+  final String status;
+
+  const IncidentData({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.code,
+    required this.severityLabel,
+    this.target = '—',
+    this.source = '—',
+    this.time = '—',
+    this.status = 'open',
+  });
+}
+
+class IncidentDetailPage extends ConsumerStatefulWidget {
+  final IncidentData data;
+
+  const IncidentDetailPage({super.key, required this.data});
   static const routePath = '/incident-detail';
 
   @override
-  State<IncidentDetailPage> createState() => _IncidentDetailPageState();
+  ConsumerState<IncidentDetailPage> createState() => _IncidentDetailPageState();
 }
 
-class _IncidentDetailPageState extends State<IncidentDetailPage> {
+class _IncidentDetailPageState extends ConsumerState<IncidentDetailPage> {
   int tabIndex = 0;
+  bool _blockingAttacker = false;
+  bool _exportingLogs = false;
+
+  IncidentData get data => widget.data;
+
+  Future<void> _openWebReport(BuildContext context) async {
+    final uri = Uri.parse('http://localhost:5173/incidents/${data.id}');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open — make sure the web app is running on port 5173'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _blockAttacker() async {
+    if (_blockingAttacker) return;
+    setState(() => _blockingAttacker = true);
+    try {
+      final apiService = ref.read(apiServiceProvider);
+      await apiService.post<Map<String, dynamic>>(
+        '/block-list',
+        data: {
+          'incident_id': data.id,
+          'target_type': 'ip',
+          'target_value': data.source,
+          'mode': 'permanent',
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Attacker blocked successfully'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Color(0xFF4ADE80),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Admin privileges required to block attackers'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _blockingAttacker = false);
+    }
+  }
+
+  Future<void> _exportLogs() async {
+    if (_exportingLogs) return;
+    setState(() => _exportingLogs = true);
+    try {
+      final apiService = ref.read(apiServiceProvider);
+      final response = await apiService.get<Map<String, dynamic>>(
+        '/incidents/${data.id}/reports',
+      );
+      if (mounted) {
+        final reports = response['data'] as List? ?? [];
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(reports.isEmpty
+                ? 'No reports available for this incident'
+                : '${reports.length} report(s) found. Opening latest...'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not fetch incident reports'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportingLogs = false);
+    }
+  }
+
+  void _comingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature — coming soon'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
+    final p = c(context);
+    final sev = _severityFromLabel(data.severityLabel);
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [_p.bgTop, _p.bgBottom],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _TopBar(
-                title: 'Incident Detail',
-                subtitle: 'Security incident analysis',
-                onBack: () => Navigator.pop(context),
-                onShare: () {},
-              ),
-              const SizedBox(height: 12),
-
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _IncidentHeroCard(
-                        severity: _Severity.critical,
-                        title: 'Brute Force Attack',
-                        description:
-                            'Active security threat detected and contained',
-                        code: 'INC-01234',
-                      ),
-                      const SizedBox(height: 12),
-
-                      Row(
-                        children: const [
-                          Expanded(
-                            child: _InfoTile(
-                              icon: Icons.access_time_rounded,
-                              label: 'Time',
-                              value: '10:24 - 10:31',
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: _InfoTile(
-                              icon: Icons.person_outline_rounded,
-                              label: 'Source',
-                              value: 'user@example.com',
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: _InfoTile(
-                              icon: Icons.my_location_rounded,
-                              label: 'Target',
-                              value: 'DB-Server-01',
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      _Tabs(
-                        index: tabIndex,
-                        onChanged: (i) => setState(() => tabIndex = i),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      if (tabIndex == 0) ...[
-                        const _SectionTitle(
-                          icon: Icons.event_note_rounded,
-                          title: 'Event Timeline',
-                        ),
-                        const SizedBox(height: 10),
-                        _TimelineItem(
-                          time: '10:24',
-                          text:
-                              'Initial brute force attempt detected',
-                        ),
-                        const SizedBox(height: 8),
-                        _TimelineItem(
-                          time: '10:26',
-                          text:
-                              'Multiple failed authentication attempts logged',
-                        ),
-                        const SizedBox(height: 8),
-                        _TimelineItem(
-                          time: '10:28',
-                          text:
-                              'Alert generated and sent to security team',
-                        ),
-                      ] else if (tabIndex == 1) ...[
-                        const _SectionTitle(
-                          icon: Icons.info_outline_rounded,
-                          title: 'Details',
-                        ),
-                        const SizedBox(height: 10),
-                        _DetailBox(
-                          title: 'Incident Summary',
-                          body:
-                              'A brute force pattern was detected against the authentication endpoint. The system throttled requests and blocked the attacker IP after repeated failures.',
-                        ),
-                        const SizedBox(height: 10),
-                        _DetailBox(
-                          title: 'Recommendation',
-                          body:
-                              'Review account access logs, enforce MFA for privileged users, and ensure rate limiting is enabled across gateways.',
-                        ),
-                      ] else ...[
-                        const _SectionTitle(
-                          icon: Icons.bolt_rounded,
-                          title: 'Actions',
-                        ),
-                        const SizedBox(height: 10),
-                        _ActionRow(
-                          icon: Icons.shield_outlined,
-                          title: 'Add rule to firewall',
-                          subtitle: 'Block source IP permanently',
-                          onTap: () {},
-                        ),
-                        const SizedBox(height: 10),
-                        _ActionRow(
-                          icon: Icons.lock_reset_rounded,
-                          title: 'Force password reset',
-                          subtitle: 'Reset affected account credentials',
-                          onTap: () {},
-                        ),
-                        const SizedBox(height: 10),
-                        _ActionRow(
-                          icon: Icons.download_rounded,
-                          title: 'Export incident logs',
-                          subtitle: 'Download full timeline report',
-                          onTap: () {},
-                        ),
-                      ],
-
-                      const SizedBox(height: 18),
-
-                      _PrimaryButton(
-                        text: 'Block Attacker',
-                        style: _PrimaryStyle.danger,
-                        onPressed: () {},
-                      ),
-                      const SizedBox(height: 10),
-                      _PrimaryButton(
-                        text: 'View Full Report on Web',
-                        style: _PrimaryStyle.dark,
-                        onPressed: () {},
-                      ),
-                    ],
-                  ),
+      backgroundColor: p.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _TopBar(
+              title: 'Incident Detail',
+              subtitle: 'Security incident analysis',
+              onBack: () => Navigator.pop(context),
+              onShare: () {},
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _HeroCard(
+                      severity: sev,
+                      title: data.title,
+                      description: data.description,
+                      code: data.code,
+                    ),
+                    const SizedBox(height: 12),
+                    _InfoRow(
+                      target: data.target,
+                      source: data.source,
+                      time: data.time,
+                    ),
+                    const SizedBox(height: 14),
+                    _Tabs(
+                      index: tabIndex,
+                      onChanged: (i) => setState(() => tabIndex = i),
+                    ),
+                    const SizedBox(height: 14),
+                    if (tabIndex == 0) _TimelineTab(data: data),
+                    if (tabIndex == 1) _DetailsTab(data: data),
+                    if (tabIndex == 2) _ActionsTab(
+                      onFirewall: () => _comingSoon('Firewall rule'),
+                      onPasswordReset: () => _comingSoon('Force password reset'),
+                      onExportLogs: _exportLogs,
+                      isExporting: _exportingLogs,
+                    ),
+                    const SizedBox(height: 20),
+                    _DangerButton(
+                      text: _blockingAttacker ? 'Blocking...' : 'Block Attacker',
+                      icon: Icons.block_rounded,
+                      onPressed: _blockAttacker,
+                    ),
+                    const SizedBox(height: 10),
+                    _SecondaryButton(
+                      text: 'View Full Report on Web',
+                      icon: Icons.open_in_browser_rounded,
+                      onPressed: () => _openWebReport(context),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/* ------------------ Top Bar ------------------ */
+/* ─────────────── Top Bar ─────────────── */
 
 class _TopBar extends StatelessWidget {
   final String title;
@@ -198,17 +226,19 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+    final p = c(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
+      decoration: BoxDecoration(
+        color: p.background,
+        border: Border(bottom: BorderSide(color: p.border.withValues(alpha: 0.6))),
+      ),
       child: Row(
         children: [
           IconButton(
             onPressed: onBack,
-            icon: Icon(Icons.arrow_back_ios_new_rounded,
-                size: 18, color: _p.text),
+            icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: p.text),
           ),
-          const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,17 +246,16 @@ class _TopBar extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: _p.text,
-                    fontSize: 16.5,
+                    color: p.text,
+                    fontSize: 17,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: _p.mutedText,
-                    fontSize: 12,
+                    color: p.mutedText,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -235,8 +264,7 @@ class _TopBar extends StatelessWidget {
           ),
           IconButton(
             onPressed: onShare,
-            icon: Icon(Icons.ios_share_rounded,
-                color: _p.text, size: 20),
+            icon: Icon(Icons.ios_share_rounded, color: p.mutedText, size: 20),
           ),
         ],
       ),
@@ -244,15 +272,15 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/* ------------------ Hero Card ------------------ */
+/* ─────────────── Hero Card ─────────────── */
 
-class _IncidentHeroCard extends StatelessWidget {
+class _HeroCard extends StatelessWidget {
   final _Severity severity;
   final String title;
   final String description;
   final String code;
 
-  const _IncidentHeroCard({
+  const _HeroCard({
     required this.severity,
     required this.title,
     required this.description,
@@ -261,17 +289,22 @@ class _IncidentHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _p.border),
+        borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: severity.heroGradient,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: severity.accent.withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,48 +312,73 @@ class _IncidentHeroCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                height: 30,
-                width: 30,
+                height: 32,
+                width: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0x14000000),
+                  color: severity.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _p.border),
+                  border: Border.all(
+                    color: severity.accent.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Icon(severity.icon, size: 16, color: severity.accent),
               ),
               const SizedBox(width: 10),
-              _Pill(
-                text: severity.label.toUpperCase(),
-                bg: severity.pillBg,
-                fg: severity.accent,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: severity.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: severity.accent.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Text(
+                  severity.label.toUpperCase(),
+                  style: TextStyle(
+                    color: severity.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Text(
             title,
-            style: TextStyle(
-              color: _p.text,
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             description,
             style: TextStyle(
-              color: _p.mutedText,
+              color: Colors.white.withValues(alpha: 0.65),
               fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            code,
-            style: TextStyle(
-              color: _p.mutedText,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              code,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
             ),
           ),
         ],
@@ -329,83 +387,98 @@ class _IncidentHeroCard extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  final String text;
-  final Color bg;
-  final Color fg;
+/* ─────────────── Info Row ─────────────── */
 
-  const _Pill({required this.text, required this.bg, required this.fg});
+class _InfoRow extends StatelessWidget {
+  final String target;
+  final String source;
+  final String time;
+
+  const _InfoRow({required this.target, required this.source, required this.time});
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: fg,
-          fontSize: 11.2,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.6,
+    return Row(
+      children: [
+        Expanded(
+          child: _InfoTile(
+            icon: Icons.my_location_rounded,
+            label: 'Target',
+            value: target,
+            iconColor: const Color(0xFF6C8EF5),
+          ),
         ),
-      ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _InfoTile(
+            icon: Icons.person_outline_rounded,
+            label: 'Source',
+            value: source,
+            iconColor: const Color(0xFFFFA04D),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _InfoTile(
+            icon: Icons.access_time_rounded,
+            label: 'Time',
+            value: time,
+            iconColor: const Color(0xFF4ADE80),
+          ),
+        ),
+      ],
     );
   }
 }
-
-/* ------------------ Info tiles ------------------ */
 
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final Color iconColor;
 
   const _InfoTile({
     required this.icon,
     required this.label,
     required this.value,
+    required this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
+    final p = c(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
       decoration: BoxDecoration(
-        color: _p.card,
+        color: p.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _p.border),
+        border: Border.all(color: p.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: _p.mutedText),
-              const SizedBox(width: 6),
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: TextStyle(
-                  color: _p.mutedText,
-                  fontSize: 11.5,
+                  color: p.mutedText,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: _p.text,
-              fontSize: 12.5,
+              color: p.text,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -415,7 +488,7 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-/* ------------------ Tabs ------------------ */
+/* ─────────────── Tabs ─────────────── */
 
 class _Tabs extends StatelessWidget {
   final int index;
@@ -425,38 +498,20 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
+    final p = c(context);
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: _p.card,
+        color: p.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _p.border),
+        border: Border.all(color: p.border),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _TabItem(
-              label: 'Timeline',
-              selected: index == 0,
-              onTap: () => onChanged(0),
-            ),
-          ),
-          Expanded(
-            child: _TabItem(
-              label: 'Details',
-              selected: index == 1,
-              onTap: () => onChanged(1),
-            ),
-          ),
-          Expanded(
-            child: _TabItem(
-              label: 'Actions',
-              selected: index == 2,
-              onTap: () => onChanged(2),
-            ),
-          ),
-        ],
+          _TabItem(label: 'Actions', selected: index == 2, onTap: () => onChanged(2)),
+          _TabItem(label: 'Details', selected: index == 1, onTap: () => onChanged(1)),
+          _TabItem(label: 'Timeline', selected: index == 0, onTap: () => onChanged(0)),
+        ].map((t) => Expanded(child: t)).toList(),
       ),
     );
   }
@@ -467,32 +522,27 @@ class _TabItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _TabItem({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+  const _TabItem({required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
-    return InkWell(
+    final p = c(context);
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         height: 38,
         decoration: BoxDecoration(
-          color: selected ? const Color(0x14000000) : Colors.transparent,
+          color: selected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
-          border: selected ? Border.all(color: _p.border) : null,
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? _p.text : _p.mutedText,
+              color: selected ? Colors.white : p.mutedText,
               fontSize: 12.5,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -501,28 +551,42 @@ class _TabItem extends StatelessWidget {
   }
 }
 
-/* ------------------ Timeline list ------------------ */
+/* ─────────────── Timeline Tab ─────────────── */
 
-class _SectionTitle extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  const _SectionTitle({required this.icon, required this.title});
+class _TimelineTab extends StatelessWidget {
+  final IncidentData data;
+  const _TimelineTab({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
-    return Row(
+    final p = c(context);
+    final events = [
+      (time: data.time, text: 'Incident detected: ${data.title}'),
+      (time: data.time, text: data.description),
+      if (data.status == 'closed')
+        (time: data.time, text: 'Incident closed'),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: _p.mutedText),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: _p.text,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w900,
-          ),
+        Row(
+          children: [
+            Icon(Icons.event_note_rounded, size: 15, color: p.mutedText),
+            const SizedBox(width: 7),
+            Text(
+              'Event Timeline',
+              style: TextStyle(color: p.text, fontSize: 13.5, fontWeight: FontWeight.w900),
+            ),
+          ],
         ),
+        const SizedBox(height: 12),
+        ...events.asMap().entries.map((e) => _TimelineItem(
+              time: e.value.time,
+              text: e.value.text,
+              isFirst: e.key == 0,
+              isLast: e.key == events.length - 1,
+            )),
       ],
     );
   }
@@ -531,59 +595,98 @@ class _SectionTitle extends StatelessWidget {
 class _TimelineItem extends StatelessWidget {
   final String time;
   final String text;
+  final bool isFirst;
+  final bool isLast;
 
   const _TimelineItem({
     required this.time,
     required this.text,
+    required this.isFirst,
+    required this.isLast,
   });
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: _p.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _p.border),
-      ),
+    final p = c(context);
+    return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            height: 24,
-            width: 24,
-            decoration: BoxDecoration(
-              color: const Color(0x14000000),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _p.border),
-            ),
-            child: const Icon(Icons.timeline_rounded,
-                size: 14, color: AppColors.primary),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
+          SizedBox(
+            width: 28,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  time,
-                  style: TextStyle(
-                    color: _p.mutedText,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
+                if (!isFirst)
+                  Expanded(
+                    flex: 1,
+                    child: Center(
+                      child: Container(width: 2, color: p.border),
+                    ),
+                  ),
+                Container(
+                  height: 28,
+                  width: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.trending_up_rounded,
+                    size: 14,
+                    color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  text,
-                  style: TextStyle(
-                    color: _p.text,
-                    fontSize: 12.8,
-                    fontWeight: FontWeight.w700,
+                if (!isLast)
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Container(width: 2, color: p.border),
+                    ),
                   ),
-                ),
               ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+                decoration: BoxDecoration(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: p.border),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          color: p.text,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      time,
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -592,43 +695,86 @@ class _TimelineItem extends StatelessWidget {
   }
 }
 
-/* ------------------ Details boxes ------------------ */
+/* ─────────────── Details Tab ─────────────── */
 
-class _DetailBox extends StatelessWidget {
-  final String title;
-  final String body;
-
-  const _DetailBox({required this.title, required this.body});
+class _DetailsTab extends StatelessWidget {
+  final IncidentData data;
+  const _DetailsTab({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DetailBox(
+          icon: Icons.summarize_rounded,
+          title: 'Incident Summary',
+          body: data.description.isNotEmpty ? data.description : 'No summary available.',
+        ),
+        const SizedBox(height: 10),
+        _DetailBox(
+          icon: Icons.info_outline_rounded,
+          title: 'Status',
+          body: 'Status: ${data.status.toUpperCase()}',
+        ),
+        const SizedBox(height: 10),
+        const _DetailBox(
+          icon: Icons.lightbulb_outline_rounded,
+          title: 'Recommendation',
+          body: 'Review access logs, enforce MFA for privileged users, '
+              'and ensure rate limiting is enabled across all gateways.',
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailBox extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _DetailBox({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = c(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _p.card,
+        color: p.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _p.border),
+        border: Border.all(color: p.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: _p.text,
-              fontSize: 12.8,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              Icon(icon, size: 14, color: AppColors.primary),
+              const SizedBox(width: 7),
+              Text(
+                title,
+                style: TextStyle(
+                  color: p.text,
+                  fontSize: 12.8,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             body,
             style: TextStyle(
-              color: _p.mutedText,
+              color: p.mutedText,
               fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
+              fontWeight: FontWeight.w500,
+              height: 1.45,
             ),
           ),
         ],
@@ -637,16 +783,63 @@ class _DetailBox extends StatelessWidget {
   }
 }
 
-/* ------------------ Actions ------------------ */
+/* ─────────────── Actions Tab ─────────────── */
+
+class _ActionsTab extends StatelessWidget {
+  final VoidCallback onFirewall;
+  final VoidCallback onPasswordReset;
+  final VoidCallback onExportLogs;
+  final bool isExporting;
+
+  const _ActionsTab({
+    required this.onFirewall,
+    required this.onPasswordReset,
+    required this.onExportLogs,
+    required this.isExporting,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _ActionRow(
+          icon: Icons.shield_outlined,
+          iconColor: const Color(0xFFFF6B6B),
+          title: 'Add rule to firewall',
+          subtitle: 'Block source IP permanently',
+          onTap: onFirewall,
+        ),
+        const SizedBox(height: 10),
+        _ActionRow(
+          icon: Icons.lock_reset_rounded,
+          iconColor: const Color(0xFFFFA04D),
+          title: 'Force password reset',
+          subtitle: 'Reset affected account credentials',
+          onTap: onPasswordReset,
+        ),
+        const SizedBox(height: 10),
+        _ActionRow(
+          icon: isExporting ? Icons.hourglass_top_rounded : Icons.download_rounded,
+          iconColor: const Color(0xFF4ADE80),
+          title: isExporting ? 'Fetching reports...' : 'Export incident logs',
+          subtitle: 'Download full timeline report',
+          onTap: isExporting ? () {} : onExportLogs,
+        ),
+      ],
+    );
+  }
+}
 
 class _ActionRow extends StatelessWidget {
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
   const _ActionRow({
     required this.icon,
+    required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.onTap,
@@ -654,30 +847,29 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
+    final p = c(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         decoration: BoxDecoration(
-          color: _p.card,
+          color: p.card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _p.border),
+          border: Border.all(color: p.border),
         ),
         child: Row(
           children: [
             Container(
-              height: 34,
-              width: 34,
+              height: 36,
+              width: 36,
               decoration: BoxDecoration(
-                color: const Color(0x14000000),
+                color: iconColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _p.border),
               ),
-              child: Icon(icon, size: 18, color: AppColors.primary),
+              child: Icon(icon, size: 18, color: iconColor),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,25 +877,24 @@ class _ActionRow extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: _p.text,
-                      fontSize: 12.8,
-                      fontWeight: FontWeight.w900,
+                      color: p.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: _p.mutedText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      color: p.mutedText,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: _p.mutedText),
+            Icon(Icons.chevron_right_rounded, color: p.mutedText, size: 20),
           ],
         ),
       ),
@@ -711,123 +902,132 @@ class _ActionRow extends StatelessWidget {
   }
 }
 
-/* ------------------ Buttons ------------------ */
+/* ─────────────── Buttons ─────────────── */
 
-enum _PrimaryStyle { danger, dark }
-
-class _PrimaryButton extends StatelessWidget {
+class _DangerButton extends StatelessWidget {
   final String text;
+  final IconData icon;
   final VoidCallback onPressed;
-  final _PrimaryStyle style;
 
-  const _PrimaryButton({
+  const _DangerButton({
     required this.text,
+    required this.icon,
     required this.onPressed,
-    required this.style,
   });
 
   @override
   Widget build(BuildContext context) {
-    final _p = c(context);
-    final bg = style == _PrimaryStyle.danger
-        ? const Color(0xFF5A1F28)
-        : const Color(0x14000000);
-    final border = style == _PrimaryStyle.danger
-        ? const Color(0xFF7A2A35)
-        : _p.border;
-    final fg = style == _PrimaryStyle.danger
-        ? const Color(0xFFFF6B6B)
-        : _p.text;
-
     return SizedBox(
-      height: 46,
-      child: ElevatedButton(
+      height: 50,
+      child: ElevatedButton.icon(
         onPressed: onPressed,
+        icon: const Icon(Icons.block_rounded, size: 18),
+        label: Text(
+          text,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: fg,
+          backgroundColor: const Color(0xFFE53935),
+          foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: border),
           ),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
         ),
       ),
     );
   }
 }
 
-/* ------------------ Severity styling ------------------ */
+class _SecondaryButton extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _SecondaryButton({
+    required this.text,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = c(context);
+    return SizedBox(
+      height: 50,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 17, color: p.text),
+        label: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: p.text,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: p.border, width: 1.2),
+          backgroundColor: p.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/* ─────────────── Severity ─────────────── */
+
+_Severity _severityFromLabel(String label) {
+  final s = label.toLowerCase();
+  if (s.contains('critical')) return _Severity.critical;
+  if (s.contains('high')) return _Severity.high;
+  if (s.contains('medium')) return _Severity.medium;
+  return _Severity.low;
+}
 
 enum _Severity { critical, high, medium, low }
 
 extension on _Severity {
   String get label {
     switch (this) {
-      case _Severity.critical:
-        return 'Critical';
-      case _Severity.high:
-        return 'High';
-      case _Severity.medium:
-        return 'Medium';
-      case _Severity.low:
-        return 'Low';
+      case _Severity.critical: return 'Critical';
+      case _Severity.high:     return 'High';
+      case _Severity.medium:   return 'Medium';
+      case _Severity.low:      return 'Low';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case _Severity.critical:
-        return Icons.shield_outlined;
-      case _Severity.high:
-        return Icons.warning_amber_rounded;
-      case _Severity.medium:
-        return Icons.report_gmailerrorred_rounded;
-      case _Severity.low:
-        return Icons.info_outline_rounded;
+      case _Severity.critical: return Icons.shield_outlined;
+      case _Severity.high:     return Icons.warning_amber_rounded;
+      case _Severity.medium:   return Icons.report_gmailerrorred_rounded;
+      case _Severity.low:      return Icons.info_outline_rounded;
     }
   }
 
   Color get accent {
     switch (this) {
-      case _Severity.critical:
-        return const Color(0xFFFF6B6B);
-      case _Severity.high:
-        return const Color(0xFFFFA04D);
-      case _Severity.medium:
-        return const Color(0xFFFFD34D);
-      case _Severity.low:
-        return const Color(0xFF4ADE80);
-    }
-  }
-
-  Color get pillBg {
-    switch (this) {
-      case _Severity.critical:
-        return const Color(0x334B1F1F);
-      case _Severity.high:
-        return const Color(0x334A2F1A);
-      case _Severity.medium:
-        return const Color(0x334A3E16);
-      case _Severity.low:
-        return const Color(0x33163D2A);
+      case _Severity.critical: return const Color(0xFFFF6B6B);
+      case _Severity.high:     return const Color(0xFFFFA04D);
+      case _Severity.medium:   return const Color(0xFFFFD34D);
+      case _Severity.low:      return const Color(0xFF4ADE80);
     }
   }
 
   List<Color> get heroGradient {
     switch (this) {
       case _Severity.critical:
-        return const [Color(0xFF2B1018), Color(0xFF1A0F1A)];
+        return const [Color(0xFF3D0C14), Color(0xFF1F0A18)];
       case _Severity.high:
-        return const [Color(0xFF2B1B10), Color(0xFF1A1210)];
+        return const [Color(0xFF3D1F0A), Color(0xFF1F1208)];
       case _Severity.medium:
-        return const [Color(0xFF2B2510), Color(0xFF1A1610)];
+        return const [Color(0xFF3D310A), Color(0xFF1F1C08)];
       case _Severity.low:
-        return const [Color(0xFF102B1E), Color(0xFF101A16)];
+        return const [Color(0xFF0A3D1F), Color(0xFF081F12)];
     }
   }
 }

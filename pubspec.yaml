@@ -26,6 +26,9 @@ dependencies:
   dio: ^5.5.0
   pretty_dio_logger: ^1.4.0
 
+  # URL Launcher
+  url_launcher: ^6.3.0
+
   # Local Storage
   shared_preferences: ^2.2.2
 

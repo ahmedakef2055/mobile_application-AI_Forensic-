@@ -33,7 +33,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   void initState() {
     super.initState();
-    emailCtrl = TextEditingController(text: 'admin@company.com');
+    emailCtrl = TextEditingController();
     passCtrl = TextEditingController();
   }
 
@@ -61,9 +61,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         showDialog(
           context: context,
           builder: (context) => ErrorDialog(
-            title: 'خطأ في تسجيل الدخول',
-            message: authState.error ?? 'فشل تسجيل الدخول',
-            actionLabel: 'إعادة محاولة',
+            title: 'Login Error',
+            message: authState.error ?? 'Login failed. Please try again.',
+            actionLabel: 'Try Again',
           ),
         );
       }
@@ -179,22 +179,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppTextField(
-            label: 'البريد الإلكتروني',
-            hint: 'admin@company.com',
+            label: 'Username or Email',
+            hint: 'Enter username or email',
             controller: emailCtrl,
             keyboardType: TextInputType.emailAddress,
-            validator: FormValidators.validateEmail,
+            validator: (v) =>
+                v == null || v.trim().isEmpty ? 'Username or email is required' : null,
             prefixIcon: Icon(Icons.mail_outline, color: _p.mutedText),
             textInputAction: TextInputAction.next,
           ),
           SizedBox(height: AppSpacing.s16),
           AppTextField(
-            label: 'كلمة المرور',
-            hint: 'أدخل كلمة المرور',
+            label: 'Password',
+            hint: 'Enter your password',
             controller: passCtrl,
             obscureText: obscurePassword,
-            validator: (value) =>
-                FormValidators.validateRequired(value, 'كلمة المرور'),
+            validator: (v) =>
+                v == null || v.isEmpty ? 'Password is required' : null,
             prefixIcon: Icon(Icons.lock_outline, color: _p.mutedText),
             suffixIcon: IconButton(
               icon: Icon(
@@ -220,7 +221,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 activeColor: AppColors.primary,
               ),
               Text(
-                'تذكرني',
+                'Remember me',
                 style: AppTextStyles.body.copyWith(
                   color: _p.mutedText,
                 ),
@@ -229,7 +230,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               TextButton(
                 onPressed: () => context.push(ForgotPasswordPage.routePath),
                 child: Text(
-                  'هل نسيت كلمة المرور؟',
+                  'Forgot password?',
                   style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
@@ -240,7 +241,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
           SizedBox(height: AppSpacing.s24),
           AppButton(
-            label: 'تسجيل الدخول',
+            label: 'Sign In',
             onPressed: _handleLogin,
             isLoading: authState.isLoading,
             isEnabled: !authState.isLoading,
@@ -251,7 +252,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                "ليس لديك حساب؟",
+                "Don't have an account?",
                 style: AppTextStyles.body.copyWith(
                   color: _p.mutedText,
                 ),
@@ -259,7 +260,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               TextButton(
                 onPressed: () => context.push(SignupPage.routePath),
                 child: Text(
-                  'إنشاء حساب',
+                  'Sign up',
                   style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w800,
@@ -271,7 +272,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           SizedBox(height: AppSpacing.s16),
           Center(
             child: Text(
-              'أو متابعة مع',
+              'Or continue with',
               style: AppTextStyles.caption.copyWith(
                 color: _p.mutedText,
               ),

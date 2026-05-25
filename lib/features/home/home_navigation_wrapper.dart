@@ -20,7 +20,7 @@ class HomeNavigationWrapper extends ConsumerStatefulWidget {
 
 class _HomeNavigationWrapperState
     extends ConsumerState<HomeNavigationWrapper> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 4;
   late Offset _dragStartPos;
 
   final List<Widget> _pages = const [

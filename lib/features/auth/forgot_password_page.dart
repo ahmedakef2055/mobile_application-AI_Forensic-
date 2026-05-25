@@ -1,22 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/assets/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../providers/auth_provider.dart';
 
-class ForgotPasswordPage extends StatefulWidget {
+class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
   static const routePath = '/forgot-password';
 
   @override
-  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
+  ConsumerState<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final emailCtrl = TextEditingController();
+  bool _isLoading = false;
+  bool _sent = false;
 
   @override
   void dispose() {
     emailCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSend() async {
+    final email = emailCtrl.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email address'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final ok = await ref.read(authProvider.notifier).resetPassword(email);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _sent = ok;
+    });
+
+    if (!ok) {
+      final err = ref.read(authProvider).error ?? 'Failed to send reset link';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(err),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override
@@ -42,13 +78,20 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: 16),
-                    _LogoHeader(),
+                    _LogoHeader(sent: _sent),
                     const SizedBox(height: 26),
-                    _ForgotCard(
-                      emailCtrl: emailCtrl,
-                      onBack: () => Navigator.pop(context),
-                      onSend: () {},
-                    ),
+                    if (_sent)
+                      _SuccessCard(
+                        email: emailCtrl.text.trim(),
+                        onBack: () => Navigator.pop(context),
+                      )
+                    else
+                      _ForgotCard(
+                        emailCtrl: emailCtrl,
+                        isLoading: _isLoading,
+                        onBack: () => Navigator.pop(context),
+                        onSend: _handleSend,
+                      ),
                     const SizedBox(height: 18),
                   ],
                 ),
@@ -62,6 +105,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 }
 
 class _LogoHeader extends StatelessWidget {
+  final bool sent;
+  const _LogoHeader({this.sent = false});
+
   @override
   Widget build(BuildContext context) {
     final _p = c(context);
@@ -91,7 +137,7 @@ class _LogoHeader extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          'Forgot Password',
+          sent ? 'Check Your Email' : 'Forgot Password',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: _p.text,
@@ -102,7 +148,9 @@ class _LogoHeader extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Enter your email and we’ll send you a reset link',
+          sent
+              ? 'We\'ve sent a reset link to your inbox'
+              : 'Enter your email and we\'ll send you a reset link',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: _p.mutedText,
@@ -115,13 +163,81 @@ class _LogoHeader extends StatelessWidget {
   }
 }
 
+class _SuccessCard extends StatelessWidget {
+  final String email;
+  final VoidCallback onBack;
+  const _SuccessCard({required this.email, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    final _p = c(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
+      decoration: BoxDecoration(
+        color: _p.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF4ADE80).withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4ADE80).withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.mark_email_read_rounded,
+                color: Color(0xFF4ADE80), size: 32),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Reset link sent to:',
+            style: TextStyle(color: _p.mutedText, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            email,
+            style: TextStyle(
+              color: _p.text,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              onPressed: onBack,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Back to Sign in',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ForgotCard extends StatelessWidget {
   final TextEditingController emailCtrl;
+  final bool isLoading;
   final VoidCallback onBack;
   final VoidCallback onSend;
 
   const _ForgotCard({
     required this.emailCtrl,
+    required this.isLoading,
     required this.onBack,
     required this.onSend,
   });
@@ -151,17 +267,37 @@ class _ForgotCard extends StatelessWidget {
           _Input(
             controller: emailCtrl,
             hint: 'example@company.com',
-            prefix: Icon(Icons.mail_outline,
-                size: 18, color: _p.mutedText),
+            prefix: Icon(Icons.mail_outline, size: 18, color: _p.mutedText),
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 14),
-
-          _PrimaryButton(
-            text: 'Send Reset Link',
-            onPressed: onSend,
+          SizedBox(
+            height: 46,
+            child: ElevatedButton(
+              onPressed: isLoading ? null : onSend,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Send Reset Link',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                    ),
+            ),
           ),
-
           const SizedBox(height: 12),
           Center(
             child: InkWell(
@@ -190,17 +326,13 @@ class _Input extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final Widget? prefix;
-  final Widget? suffix;
   final TextInputType? keyboardType;
-  final bool obscure;
 
   const _Input({
     required this.controller,
     required this.hint,
     this.prefix,
-    this.suffix,
     this.keyboardType,
-    this.obscure = false,
   });
 
   @override
@@ -209,17 +341,14 @@ class _Input extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      obscureText: obscure,
       style: TextStyle(color: _p.text, fontSize: 14.5),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: _p.mutedText, fontSize: 13.5),
         prefixIcon: prefix,
-        suffixIcon: suffix,
         filled: true,
         fillColor: _p.isDark ? const Color(0x14000000) : _p.background,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: _p.border),
@@ -231,36 +360,6 @@ class _Input extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-
-  const _PrimaryButton({required this.text, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final _p = c(context);
-    return SizedBox(
-      height: 46,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
         ),
       ),
     );

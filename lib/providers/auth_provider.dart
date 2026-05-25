@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
@@ -98,7 +99,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return true;
     } catch (e) {
       state = state.copyWith(
-        error: 'فشل تسجيل الدخول: ${e.toString()}',
+        error: _extractError(e, 'فشل تسجيل الدخول'),
         isLoading: false,
       );
       return false;
@@ -134,7 +135,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return true;
     } catch (e) {
       state = state.copyWith(
-        error: 'فشل إنشاء الحساب: ${e.toString()}',
+        error: _extractError(e, 'فشل إنشاء الحساب'),
         isLoading: false,
       );
       return false;
@@ -160,15 +161,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> resetPassword(String email) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
+      final apiService = ref.read(apiServiceProvider);
+      await apiService.post<Map<String, dynamic>>(
+        '/auth/forgot-password',
+        data: {'email': email},
+      );
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
       state = state.copyWith(
-        error: 'فشل إرسال رابط إعادة تعيين كلمة المرور: ${e.toString()}',
+        error: _extractError(e, 'فشل إرسال رابط إعادة تعيين كلمة المرور'),
         isLoading: false,
       );
       return false;
     }
+  }
+
+  String _extractError(Object e, String fallback) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final msg = data['message'];
+        if (msg is String && msg.isNotEmpty) return _translateApiError(msg);
+      }
+    }
+    return fallback;
+  }
+
+  String _translateApiError(String msg) {
+    const translations = {
+      'The username has already been taken.': 'اسم المستخدم مستخدم بالفعل',
+      'The email has already been taken.': 'البريد الإلكتروني مستخدم بالفعل',
+      'Invalid credentials': 'اسم المستخدم أو كلمة المرور غير صحيحة',
+      'Your account has been disabled. Please contact an administrator.':
+          'حسابك معطّل، تواصل مع المسؤول',
+      'Too Many Attempts.': 'محاولات كثيرة جداً، حاول بعد دقيقة',
+    };
+    return translations[msg] ?? msg;
   }
 
   User _userFromApi(Map<String, dynamic> json) {
